@@ -2,6 +2,10 @@ abstract class WeatherEvent {
   const WeatherEvent();
 }
 
+final class InitializeWeather extends WeatherEvent {
+  const InitializeWeather();
+}
+
 class FetchCurrentLocationWeather extends WeatherEvent {
   const FetchCurrentLocationWeather();
 }

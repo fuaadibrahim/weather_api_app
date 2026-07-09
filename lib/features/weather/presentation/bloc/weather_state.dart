@@ -1,11 +1,11 @@
-import 'package:weather_api/features/weather/data/models/weather_forecast_model.dart';
+import '../../data/models/weather_forecast_model.dart';
 
 class WeatherState {
   const WeatherState({
     this.weatherData,
     this.isLoading = false,
     this.errorMessage,
-    this.usingCurrentLocation = true,
+    this.usingCurrentLocation = false,
     this.lastSearchedCity,
   });
 
@@ -19,15 +19,21 @@ class WeatherState {
     WeatherForecastModel? weatherData,
     bool? isLoading,
     String? errorMessage,
+    bool clearErrorMessage = false,
     bool? usingCurrentLocation,
     String? lastSearchedCity,
+    bool clearLastSearchedCity = false,
   }) {
     return WeatherState(
       weatherData: weatherData ?? this.weatherData,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage,
+      errorMessage: clearErrorMessage
+          ? null
+          : errorMessage ?? this.errorMessage,
       usingCurrentLocation: usingCurrentLocation ?? this.usingCurrentLocation,
-      lastSearchedCity: lastSearchedCity ?? this.lastSearchedCity,
+      lastSearchedCity: clearLastSearchedCity
+          ? null
+          : lastSearchedCity ?? this.lastSearchedCity,
     );
   }
 }

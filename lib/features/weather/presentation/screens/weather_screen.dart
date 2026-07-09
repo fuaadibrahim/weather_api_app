@@ -19,7 +19,6 @@ class WeatherScreen extends StatefulWidget {
 
 class _WeatherScreenState extends State<WeatherScreen> {
   final TextEditingController cityController = TextEditingController();
-
   final PageController pageController = PageController();
 
   int currentPage = 0;
@@ -80,6 +79,13 @@ class _WeatherScreenState extends State<WeatherScreen> {
     }
 
     return forecast.weather.first;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    context.read<WeatherBloc>().add(const InitializeWeather());
   }
 
   @override
