@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/services/location_services.dart';
@@ -29,31 +30,66 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
     InitializeWeather event,
     Emitter<WeatherState> emit,
   ) async {
-    emit(state.copyWith(isLoading: true, clearErrorMessage: true));
+    final cachedWeather = await _weatherLocalStorage.getWeather();
 
-    try {
-      final cachedWeather = await _weatherLocalStorage.getWeather();
-
-      if (cachedWeather != null) {
-        emit(
-          state.copyWith(
-            weatherData: cachedWeather,
-            isLoading: false,
-            clearErrorMessage: true,
-            usingCurrentLocation: false,
-            lastSearchedCity: cachedWeather.city?.name,
-          ),
-        );
-      } else {
-        emit(state.copyWith(isLoading: false, clearErrorMessage: true));
-      }
-    } catch (error) {
+    if (cachedWeather != null) {
       emit(
         state.copyWith(
+          weatherData: cachedWeather,
           isLoading: false,
-          errorMessage: 'Failed to load saved weather',
+          isInitialized: true,
+          usingCurrentLocation: false,
+          lastSearchedCity: cachedWeather.city?.name,
+          clearErrorMessage: true,
         ),
       );
+    } else {
+      emit(
+        state.copyWith(
+          weatherData: null,
+          isLoading: false,
+          isInitialized: true,
+          clearErrorMessage: true,
+        ),
+      );
+    }
+
+    try {
+      final position = await _locationServices.determineCurrentPosition();
+
+      final latestWeather = await _weatherService.getWeather(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+
+      await _weatherLocalStorage.saveWeather(latestWeather);
+
+      emit(
+        state.copyWith(
+          weatherData: latestWeather,
+          isLoading: false,
+          isInitialized: true,
+          usingCurrentLocation: true,
+          clearLastSearchedCity: true,
+          clearErrorMessage: true,
+        ),
+      );
+    } catch (error) {
+      debugPrint('Weather initialization error: $error');
+
+      if (cachedWeather == null) {
+        emit(
+          state.copyWith(
+            weatherData: null,
+            isLoading: false,
+            isInitialized: true,
+            errorMessage: _getFriendlyErrorMessage(
+              error,
+              hasWeatherData: false,
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -61,7 +97,12 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
     FetchCurrentLocationWeather event,
     Emitter<WeatherState> emit,
   ) async {
-    emit(state.copyWith(isLoading: true, clearErrorMessage: true));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+      ),
+    );
 
     try {
       final position = await _locationServices.determineCurrentPosition();
@@ -77,13 +118,25 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
         state.copyWith(
           weatherData: weatherData,
           isLoading: false,
+          isInitialized: true,
           clearErrorMessage: true,
           usingCurrentLocation: true,
           clearLastSearchedCity: true,
         ),
       );
     } catch (error) {
-      emit(state.copyWith(isLoading: false, errorMessage: error.toString()));
+      debugPrint('Current-location weather error: $error');
+
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isInitialized: true,
+          errorMessage: _getFriendlyErrorMessage(
+            error,
+            hasWeatherData: state.weatherData != null,
+          ),
+        ),
+      );
     }
   }
 
@@ -94,11 +147,20 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
     final String cleanedCity = event.city.trim();
 
     if (cleanedCity.isEmpty) {
-      emit(state.copyWith(errorMessage: 'Please enter a city name'));
+      emit(
+        state.copyWith(
+          errorMessage: 'Please enter a city name.',
+        ),
+      );
       return;
     }
 
-    emit(state.copyWith(isLoading: true, clearErrorMessage: true));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+      ),
+    );
 
     try {
       final weatherData = await _weatherService.getWeatherByCity(cleanedCity);
@@ -109,13 +171,25 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
         state.copyWith(
           weatherData: weatherData,
           isLoading: false,
+          isInitialized: true,
           clearErrorMessage: true,
           usingCurrentLocation: false,
           lastSearchedCity: cleanedCity,
         ),
       );
     } catch (error) {
-      emit(state.copyWith(isLoading: false, errorMessage: error.toString()));
+      debugPrint('City weather search error: $error');
+
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isInitialized: true,
+          errorMessage: _getFriendlyErrorMessage(
+            error,
+            hasWeatherData: state.weatherData != null,
+          ),
+        ),
+      );
     }
   }
 
@@ -123,7 +197,12 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
     RefreshWeather event,
     Emitter<WeatherState> emit,
   ) async {
-    emit(state.copyWith(isLoading: true, clearErrorMessage: true));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+      ),
+    );
 
     try {
       if (state.usingCurrentLocation) {
@@ -146,7 +225,7 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
           ),
         );
       } else {
-        final city = state.lastSearchedCity;
+        final String? city = state.lastSearchedCity;
 
         if (city == null || city.trim().isEmpty) {
           throw Exception('No city available for refresh');
@@ -167,7 +246,84 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
         );
       }
     } catch (error) {
-      emit(state.copyWith(isLoading: false, errorMessage: error.toString()));
+      debugPrint('Weather refresh error: $error');
+
+      emit(
+        state.copyWith(
+          isLoading: false,
+          errorMessage: _getFriendlyErrorMessage(
+            error,
+            hasWeatherData: state.weatherData != null,
+          ),
+        ),
+      );
     }
+  }
+
+  String _getFriendlyErrorMessage(
+    Object error, {
+    required bool hasWeatherData,
+  }) {
+    final String message = error.toString().toLowerCase();
+
+    if (message.contains('socketexception') ||
+        message.contains('clientexception') ||
+        message.contains('failed host lookup') ||
+        message.contains('no address associated with hostname') ||
+        message.contains('network is unreachable') ||
+        message.contains('connection refused')) {
+      if (hasWeatherData) {
+        return 'No internet connection. Showing the last saved weather.';
+      }
+
+      return 'No internet connection. Please check your connection.';
+    }
+
+    if (message.contains('timeout') ||
+        message.contains('timed out')) {
+      if (hasWeatherData) {
+        return 'The request took too long. Showing the last saved weather.';
+      }
+
+      return 'The request took too long. Please try again.';
+    }
+
+    if (message.contains('location services are disabled') ||
+        message.contains('location service is disabled')) {
+      return 'Location services are turned off. Please enable location.';
+    }
+
+    if (message.contains('permanently denied') ||
+        message.contains('denied forever')) {
+      return 'Location permission is permanently denied. Enable it from app settings.';
+    }
+
+    if (message.contains('permission') &&
+        message.contains('denied')) {
+      return 'Location permission was denied.';
+    }
+
+    if (message.contains('city not found') ||
+        message.contains('invalid city') ||
+        message.contains('404')) {
+      return 'City not found. Please check the city name.';
+    }
+
+    if (message.contains('no city available for refresh')) {
+      return 'Search for a city or use your current location first.';
+    }
+
+    if (message.contains('401') ||
+        message.contains('403') ||
+        message.contains('unauthorized') ||
+        message.contains('forbidden')) {
+      return 'Weather service access failed. Please check the API configuration.';
+    }
+
+    if (hasWeatherData) {
+      return 'Unable to update the weather. Showing the last saved weather.';
+    }
+
+    return 'Unable to load the weather right now. Please try again.';
   }
 }

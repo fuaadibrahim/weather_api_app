@@ -7,6 +7,7 @@ class WeatherState {
     this.errorMessage,
     this.usingCurrentLocation = false,
     this.lastSearchedCity,
+    this.isInitialized = false,
   });
 
   final WeatherForecastModel? weatherData;
@@ -14,6 +15,7 @@ class WeatherState {
   final String? errorMessage;
   final bool usingCurrentLocation;
   final String? lastSearchedCity;
+  final bool isInitialized;
 
   WeatherState copyWith({
     WeatherForecastModel? weatherData,
@@ -23,6 +25,7 @@ class WeatherState {
     bool? usingCurrentLocation,
     String? lastSearchedCity,
     bool clearLastSearchedCity = false,
+    bool? isInitialized,
   }) {
     return WeatherState(
       weatherData: weatherData ?? this.weatherData,
@@ -34,6 +37,7 @@ class WeatherState {
       lastSearchedCity: clearLastSearchedCity
           ? null
           : lastSearchedCity ?? this.lastSearchedCity,
+      isInitialized: isInitialized ?? this.isInitialized,
     );
   }
 }

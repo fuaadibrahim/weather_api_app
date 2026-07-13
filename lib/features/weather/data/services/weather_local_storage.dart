@@ -15,14 +15,10 @@ class WeatherLocalStorage {
     final String encodedWeather = jsonEncode(weatherData.toJson());
 
     await _box.put(_weatherDataKey, encodedWeather);
-
-  
   }
 
   Future<WeatherForecastModel?> getWeather() async {
     final cachedData = _box.get(_weatherDataKey);
-
-    
 
     if (cachedData == null) {
       return null;
@@ -38,18 +34,15 @@ class WeatherLocalStorage {
           jsonDecode(jsonEncode(cachedData)),
         );
       } else {
-      
         return null;
       }
 
-      final WeatherForecastModel weatherData =
-          WeatherForecastModel.fromJson(weatherMap);
-
-      
+      final WeatherForecastModel weatherData = WeatherForecastModel.fromJson(
+        weatherMap,
+      );
 
       return weatherData;
     } catch (error) {
-      
       return null;
     }
   }

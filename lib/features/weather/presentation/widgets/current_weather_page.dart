@@ -391,7 +391,7 @@ class CurrentWeatherPage extends StatelessWidget {
           Icon(Icons.cloud_off_outlined, color: Colors.white, size: 65),
           SizedBox(height: 18),
           Text(
-            'No weather data found',
+            'Please check your internet connection',
             style: TextStyle(
               color: Colors.white,
               fontSize: 21,

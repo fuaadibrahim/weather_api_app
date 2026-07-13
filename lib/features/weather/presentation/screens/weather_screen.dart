@@ -1,14 +1,14 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/weather_forecast_model.dart';
-import '../widgets/current_weather_page.dart';
-import '../widgets/forecast_details_page.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/weather_bloc.dart';
 import '../bloc/weather_event.dart';
 import '../bloc/weather_state.dart';
+import '../widgets/current_weather_page.dart';
+import '../widgets/forecast_details_page.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -97,15 +97,44 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<WeatherBloc, WeatherState>(
-      builder: (context, state) {
-        final weatherData = state.weatherData;
+    return BlocConsumer<WeatherBloc, WeatherState>(
+      listenWhen: (previous, current) {
+        return current.weatherData != null &&
+            current.errorMessage != null &&
+            previous.errorMessage != current.errorMessage;
+      },
+      listener: (context, state) {
+        final String? message = state.errorMessage;
 
-        if (state.isLoading && weatherData == null) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+        if (message == null) {
+          return;
         }
+
+        final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+        scaffoldMessenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(message),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            ),
+          );
+      },
+      builder: (context, state) {
+        final WeatherForecastModel? weatherData = state.weatherData;
+
+        /*
+         When cached weather exists, do not pass the error to the pages.
+         This prevents the large error card from replacing cached weather.
+
+         The error is instead shown by the SnackBar listener above.
+        */
+        final String? visiblePageError = weatherData == null
+            ? state.errorMessage
+            : null;
 
         return Scaffold(
           backgroundColor: Colors.transparent,
@@ -134,18 +163,17 @@ class _WeatherScreenState extends State<WeatherScreen> {
                               cityController: cityController,
                               weatherData: weatherData,
                               isLoading: state.isLoading,
-                              errorMessage: state.errorMessage,
+                              errorMessage: visiblePageError,
                               onSearch: _fetchWeatherByCity,
                               onCurrentLocation:
                                   _fetchWeatherFromCurrentLocation,
                               onRefresh: _refreshWeather,
                               onOpenForecast: () => openPage(1),
                             ),
-
                             ForecastDetailsPage(
                               weatherData: weatherData,
                               isLoading: state.isLoading,
-                              errorMessage: state.errorMessage,
+                              errorMessage: visiblePageError,
                               onRefresh: _refreshWeather,
                               onBackToCurrent: () => openPage(0),
                             ),
