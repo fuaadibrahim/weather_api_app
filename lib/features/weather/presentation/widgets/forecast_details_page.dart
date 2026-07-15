@@ -1,16 +1,14 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/models/weather_forecast_model.dart';
+import 'daily_forecast_section.dart';
+import 'hourly_forecast_section.dart';
+import 'weather_metrics_section.dart';
 
 class ForecastDetailsPage extends StatelessWidget {
-  final WeatherForecastModel? weatherData;
-  final bool isLoading;
-  final String? errorMessage;
-  final Future<void> Function() onRefresh;
-  final VoidCallback onBackToCurrent;
-
   const ForecastDetailsPage({
     super.key,
     required this.weatherData,
@@ -19,6 +17,16 @@ class ForecastDetailsPage extends StatelessWidget {
     required this.onRefresh,
     required this.onBackToCurrent,
   });
+
+  final WeatherForecastModel? weatherData;
+  final bool isLoading;
+  final String? errorMessage;
+  final Future<void> Function() onRefresh;
+  final VoidCallback onBackToCurrent;
+
+  bool get isNativeWindows {
+    return !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+  }
 
   ForecastItem? get currentForecast {
     final forecasts = weatherData?.forecastList;
@@ -34,7 +42,7 @@ class ForecastDetailsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final horizontalPadding = constraints.maxWidth < 600 ? 16.0 : 30.0;
+        final double horizontalPadding = constraints.maxWidth < 600 ? 16 : 30;
 
         return RefreshIndicator(
           onRefresh: onRefresh,
@@ -159,25 +167,19 @@ class ForecastDetailsPage extends StatelessWidget {
       children: [
         buildCurrentSummary(),
         const SizedBox(height: 26),
-        buildMetricsGrid(),
+
+        WeatherMetricsSection(weatherData: weatherData!),
+
         const SizedBox(height: 34),
-        buildSectionHeader(
-          icon: Icons.schedule_rounded,
-          title: 'Hourly Outlook',
-          subtitle: 'Upcoming three-hour forecast',
-        ),
-        const SizedBox(height: 18),
-        buildHourlyCards(),
+
+        HourlyForecastSection(weatherData: weatherData!),
+
         const SizedBox(height: 34),
-        buildSectionHeader(
-          icon: Icons.calendar_today_outlined,
-          title: 'Five-Day Forecast',
-          subtitle: 'Daily weather summary',
-        ),
-        const SizedBox(height: 18),
-        buildDailyCards(),
-        const SizedBox(height: 24),
-        buildBackHint(),
+
+        DailyForecastSection(weatherData: weatherData!),
+
+        if (!isNativeWindows) ...[const SizedBox(height: 24), buildBackHint()],
+
         const SizedBox(height: 18),
       ],
     );
@@ -305,12 +307,13 @@ class ForecastDetailsPage extends StatelessWidget {
   }
 
   Widget buildCurrentSummary() {
-    final forecast = currentForecast!;
-    final condition = forecast.weather.isNotEmpty
+    final ForecastItem forecast = currentForecast!;
+
+    final WeatherCondition? condition = forecast.weather.isNotEmpty
         ? forecast.weather.first
         : null;
 
-    final temperature = toCelsius(forecast.main?.temperature);
+    final double? temperature = toCelsius(forecast.main?.temperature);
 
     return glassContainer(
       width: double.infinity,
@@ -319,9 +322,9 @@ class ForecastDetailsPage extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 620;
+          final bool isWide = constraints.maxWidth >= 620;
 
-          final iconAndTemperature = Row(
+          final Widget iconAndTemperature = Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               buildWeatherIcon(
@@ -344,7 +347,7 @@ class ForecastDetailsPage extends StatelessWidget {
             ],
           );
 
-          final text = Column(
+          final Widget text = Column(
             crossAxisAlignment: isWide
                 ? CrossAxisAlignment.start
                 : CrossAxisAlignment.center,
@@ -372,15 +375,15 @@ class ForecastDetailsPage extends StatelessWidget {
                 iconAndTemperature,
                 const SizedBox(width: 18),
                 Expanded(child: text),
-                const Icon(
-                  Icons.swipe_right_alt_rounded,
-                  color: Colors.white38,
-                  size: 32,
-                ),
+                if (!isNativeWindows)
+                  const Icon(
+                    Icons.swipe_right_alt_rounded,
+                    color: Colors.white38,
+                    size: 32,
+                  ),
               ],
             );
           }
-
           return Column(
             children: [iconAndTemperature, const SizedBox(height: 8), text],
           );
@@ -389,499 +392,13 @@ class ForecastDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget buildMetricsGrid() {
-    final forecast = currentForecast!;
-
-    final humidity = forecast.main?.humidity;
-    final windSpeed = forecast.wind?.speed;
-    final pressure = forecast.main?.pressure;
-
-    final rainChance = forecast.probabilityOfPrecipitation != null
-        ? (forecast.probabilityOfPrecipitation! * 100).round()
-        : null;
-
-    return glassContainer(
-      width: double.infinity,
-      radius: 24,
-      opacity: 0.10,
-      padding: const EdgeInsets.all(16),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 700;
-
-          final humidityItem = buildSimpleMetricItem(
-            icon: Icons.water_drop_outlined,
-            label: 'Humidity',
-            value: humidity != null ? '$humidity%' : '--',
-            accent: const Color(0xFF66D5FF),
-          );
-
-          final windItem = buildSimpleMetricItem(
-            icon: Icons.air_rounded,
-            label: 'Wind',
-            value: windSpeed != null
-                ? '${windSpeed.toStringAsFixed(1)} m/s'
-                : '--',
-            accent: const Color(0xFF99E8D7),
-          );
-
-          final rainItem = buildSimpleMetricItem(
-            icon: Icons.umbrella_outlined,
-            label: 'Rain',
-            value: rainChance != null ? '$rainChance%' : '--',
-            accent: const Color(0xFFB4A6FF),
-          );
-
-          final pressureItem = buildSimpleMetricItem(
-            icon: Icons.speed_rounded,
-            label: 'Pressure',
-            value: pressure != null ? '$pressure hPa' : '--',
-            accent: const Color(0xFFFFCA80),
-          );
-
-          if (isWide) {
-            return Row(
-              children: [
-                Expanded(child: humidityItem),
-                buildMetricDivider(vertical: true),
-                Expanded(child: windItem),
-                buildMetricDivider(vertical: true),
-                Expanded(child: rainItem),
-                buildMetricDivider(vertical: true),
-                Expanded(child: pressureItem),
-              ],
-            );
-          }
-
-          return Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(child: humidityItem),
-                  buildMetricDivider(vertical: true),
-                  Expanded(child: windItem),
-                ],
-              ),
-              buildMetricDivider(vertical: false),
-              Row(
-                children: [
-                  Expanded(child: rainItem),
-                  buildMetricDivider(vertical: true),
-                  Expanded(child: pressureItem),
-                ],
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget buildSimpleMetricItem({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color accent,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.13),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Icon(icon, color: accent, size: 21),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white60, fontSize: 11),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget buildMetricDivider({required bool vertical}) {
-    if (vertical) {
-      return Container(
-        width: 1,
-        height: 48,
-        color: Colors.white.withValues(alpha: 0.12),
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      height: 1,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      color: Colors.white.withValues(alpha: 0.12),
-    );
-  }
-
-  Widget buildSectionHeader({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    return Row(
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: const Color(0xFFB8E7FF).withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(13),
-          ),
-          child: Icon(icon, color: const Color(0xFFB8E7FF), size: 22),
-        ),
-        const SizedBox(width: 11),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(color: Colors.white60, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget buildHourlyCards() {
-    final forecasts = weatherData!.forecastList;
-    final count = forecasts.length > 8 ? 8 : forecasts.length;
-
-    return SizedBox(
-      height: 180,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: count,
-        separatorBuilder: (_, _) {
-          return const SizedBox(width: 12);
-        },
-        itemBuilder: (context, index) {
-          final forecast = forecasts[index];
-
-          final condition = forecast.weather.isNotEmpty
-              ? forecast.weather.first
-              : null;
-
-          final temperature = toCelsius(forecast.main?.temperature);
-
-          final rainChance = forecast.probabilityOfPrecipitation != null
-              ? (forecast.probabilityOfPrecipitation! * 100).round()
-              : null;
-
-          return glassContainer(
-            width: 125,
-            radius: 23,
-            opacity: index == 0 ? 0.19 : 0.09,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: index == 0
-                        ? const Color(0xFFB8E7FF).withValues(alpha: 0.20)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Text(
-                    index == 0 ? 'NOW' : formatTime(forecast.dateTimeText),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: index == 0
-                          ? FontWeight.bold
-                          : FontWeight.w500,
-                    ),
-                  ),
-                ),
-                buildWeatherIcon(
-                  iconCode: condition?.icon,
-                  condition: condition?.main,
-                  size: 58,
-                ),
-                Text(
-                  temperature != null
-                      ? '${temperature.toStringAsFixed(0)}°C'
-                      : '--',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.water_drop,
-                      color: Color(0xFF9DDBFF),
-                      size: 13,
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      rainChance != null ? '$rainChance%' : '--',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget buildDailyCards() {
-    final summaries = _createDailySummaries().take(5).toList();
-
-    return SizedBox(
-      height: 320,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: summaries.length,
-        separatorBuilder: (_, _) {
-          return const SizedBox(width: 13);
-        },
-        itemBuilder: (context, index) {
-          final summary = summaries[index];
-
-          return glassContainer(
-            width: 210,
-            radius: 25,
-            opacity: 0.10,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  index == 0 ? 'Today' : formatWeekday(summary.date),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  formatShortDate(summary.date),
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
-                ),
-                const SizedBox(height: 10),
-                Center(
-                  child: buildWeatherIcon(
-                    iconCode: summary.iconCode,
-                    condition: summary.condition,
-                    size: 60,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  capitalize(summary.description ?? 'Weather'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    buildTemperatureBadge(
-                      label: 'HIGH',
-                      value:
-                          '${summary.maximumTemperature.toStringAsFixed(0)}°',
-                      color: const Color(0xFFFFD18A),
-                    ),
-                    const SizedBox(width: 7),
-                    buildTemperatureBadge(
-                      label: 'LOW',
-                      value:
-                          '${summary.minimumTemperature.toStringAsFixed(0)}°',
-                      color: const Color(0xFF9DDBFF),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.07),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.10),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.umbrella_outlined,
-                            color: Color(0xFF9DDBFF),
-                            size: 15,
-                          ),
-                          const SizedBox(width: 6),
-                          const Expanded(
-                            child: Text(
-                              'Rain chance',
-                              style: TextStyle(
-                                color: Colors.white60,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '${summary.rainChance}%',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.water_drop_outlined,
-                            color: Color(0xFF9DDBFF),
-                            size: 15,
-                          ),
-                          const SizedBox(width: 6),
-                          const Expanded(
-                            child: Text(
-                              'Humidity',
-                              style: TextStyle(
-                                color: Colors.white60,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '${summary.averageHumidity}%',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget buildTemperatureBadge({
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.18)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget buildBackHint() {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onBackToCurrent,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: const Row(
+      child: const Padding(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.arrow_back_rounded, color: Colors.white60, size: 17),
@@ -938,8 +455,9 @@ class ForecastDetailsPage extends StatelessWidget {
     required String? condition,
     required double size,
   }) {
-    final normalizedCondition = condition?.toLowerCase() ?? '';
-    final isNight = iconCode?.endsWith('n') ?? false;
+    final String normalizedCondition = condition?.toLowerCase() ?? '';
+
+    final bool isNight = iconCode?.endsWith('n') ?? false;
 
     return SizedBox(
       width: size,
@@ -1293,121 +811,10 @@ class ForecastDetailsPage extends StatelessWidget {
     }
   }
 
-  List<_DailySummary> _createDailySummaries() {
-    final grouped = <String, List<ForecastItem>>{};
-
-    for (final forecast in weatherData?.forecastList ?? []) {
-      final date = parseDateTime(forecast.dateTimeText);
-
-      if (date == null) continue;
-
-      final key =
-          '${date.year}-'
-          '${date.month.toString().padLeft(2, '0')}-'
-          '${date.day.toString().padLeft(2, '0')}';
-
-      grouped.putIfAbsent(key, () => []);
-
-      grouped[key]!.add(forecast);
-    }
-
-    final summaries = <_DailySummary>[];
-
-    for (final entry in grouped.entries) {
-      final forecasts = entry.value;
-
-      if (forecasts.isEmpty) continue;
-
-      double? minimum;
-      double? maximum;
-      int highestRainChance = 0;
-      int totalHumidity = 0;
-      int humidityCount = 0;
-
-      ForecastItem representative = forecasts.first;
-      int closestToMidday = 24;
-
-      for (final forecast in forecasts) {
-        final minimumValue = toCelsius(
-          forecast.main?.minimumTemperature ?? forecast.main?.temperature,
-        );
-
-        final maximumValue = toCelsius(
-          forecast.main?.maximumTemperature ?? forecast.main?.temperature,
-        );
-
-        if (minimumValue != null &&
-            (minimum == null || minimumValue < minimum)) {
-          minimum = minimumValue;
-        }
-
-        if (maximumValue != null &&
-            (maximum == null || maximumValue > maximum)) {
-          maximum = maximumValue;
-        }
-
-        final rainProbability = forecast.probabilityOfPrecipitation;
-
-        if (rainProbability != null) {
-          final rainChance = (rainProbability * 100).round();
-
-          if (rainChance > highestRainChance) {
-            highestRainChance = rainChance;
-          }
-        }
-
-        final humidity = forecast.main?.humidity;
-
-        if (humidity != null) {
-          totalHumidity += humidity;
-          humidityCount++;
-        }
-
-        final date = parseDateTime(forecast.dateTimeText);
-
-        if (date != null) {
-          final distance = (date.hour - 12).abs();
-
-          if (distance < closestToMidday) {
-            closestToMidday = distance;
-            representative = forecast;
-          }
-        }
-      }
-
-      final representativeCondition = representative.weather.isNotEmpty
-          ? representative.weather.first
-          : null;
-
-      final date = DateTime.tryParse(entry.key);
-
-      if (date == null || minimum == null || maximum == null) {
-        continue;
-      }
-
-      summaries.add(
-        _DailySummary(
-          date: date,
-          minimumTemperature: minimum,
-          maximumTemperature: maximum,
-          rainChance: highestRainChance,
-          averageHumidity: humidityCount == 0
-              ? 0
-              : (totalHumidity / humidityCount).round(),
-          iconCode: representativeCondition?.icon,
-          condition: representativeCondition?.main,
-          description: representativeCondition?.description,
-        ),
-      );
-    }
-
-    summaries.sort((a, b) => a.date.compareTo(b.date));
-
-    return summaries;
-  }
-
   double? toCelsius(double? kelvin) {
-    if (kelvin == null) return null;
+    if (kelvin == null) {
+      return null;
+    }
 
     return kelvin - 273.15;
   }
@@ -1421,15 +828,17 @@ class ForecastDetailsPage extends StatelessWidget {
   }
 
   String formatTime(String? value) {
-    final date = parseDateTime(value);
+    final DateTime? date = parseDateTime(value);
 
-    if (date == null) return '--';
+    if (date == null) {
+      return '--';
+    }
 
     int hour = date.hour;
 
-    final minute = date.minute.toString().padLeft(2, '0');
+    final String minute = date.minute.toString().padLeft(2, '0');
 
-    final period = hour >= 12 ? 'PM' : 'AM';
+    final String period = hour >= 12 ? 'PM' : 'AM';
 
     if (hour == 0) {
       hour = 12;
@@ -1440,95 +849,11 @@ class ForecastDetailsPage extends StatelessWidget {
     return '$hour:$minute $period';
   }
 
-  String formatWeekday(DateTime date) {
-    const weekdays = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-
-    return weekdays[date.weekday - 1];
-  }
-
-  String formatShortDate(DateTime date) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-
-    return '${date.day} ${months[date.month - 1]}';
-  }
-
   String capitalize(String text) {
-    if (text.isEmpty) return text;
+    if (text.isEmpty) {
+      return text;
+    }
 
     return text[0].toUpperCase() + text.substring(1);
   }
-
-  IconData getFallbackIcon(String? condition) {
-    switch (condition?.toLowerCase()) {
-      case 'clear':
-        return Icons.wb_sunny_rounded;
-
-      case 'clouds':
-        return Icons.cloud_rounded;
-
-      case 'rain':
-        return Icons.water_drop_rounded;
-
-      case 'drizzle':
-        return Icons.grain_rounded;
-
-      case 'thunderstorm':
-        return Icons.thunderstorm_rounded;
-
-      case 'snow':
-        return Icons.ac_unit_rounded;
-
-      case 'mist':
-      case 'fog':
-      case 'haze':
-      case 'smoke':
-        return Icons.foggy;
-
-      default:
-        return Icons.cloud_queue_rounded;
-    }
-  }
-}
-
-class _DailySummary {
-  final DateTime date;
-  final double minimumTemperature;
-  final double maximumTemperature;
-  final int rainChance;
-  final int averageHumidity;
-  final String? iconCode;
-  final String? condition;
-  final String? description;
-
-  const _DailySummary({
-    required this.date,
-    required this.minimumTemperature,
-    required this.maximumTemperature,
-    required this.rainChance,
-    required this.averageHumidity,
-    required this.iconCode,
-    required this.condition,
-    required this.description,
-  });
 }

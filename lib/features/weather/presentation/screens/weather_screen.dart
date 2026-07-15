@@ -9,6 +9,7 @@ import '../bloc/weather_event.dart';
 import '../bloc/weather_state.dart';
 import '../widgets/current_weather_page.dart';
 import '../widgets/forecast_details_page.dart';
+import '../widgets/desktop_weather_page.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -82,13 +83,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-
-    context.read<WeatherBloc>().add(const InitializeWeather());
-  }
-
-  @override
   void dispose() {
     cityController.dispose();
     pageController.dispose();
@@ -147,44 +141,63 @@ class _WeatherScreenState extends State<WeatherScreen> {
               children: [
                 buildBackgroundShapes(),
                 SafeArea(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: PageView(
-                          controller: pageController,
-                          physics: const BouncingScrollPhysics(),
-                          onPageChanged: (int page) {
-                            setState(() {
-                              currentPage = page;
-                            });
-                          },
-                          children: [
-                            CurrentWeatherPage(
-                              cityController: cityController,
-                              weatherData: weatherData,
-                              isLoading: state.isLoading,
-                              errorMessage: visiblePageError,
-                              onSearch: _fetchWeatherByCity,
-                              onCurrentLocation:
-                                  _fetchWeatherFromCurrentLocation,
-                              onRefresh: _refreshWeather,
-                              onOpenForecast: () => openPage(1),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final bool useDesktopLayout =
+                          constraints.maxWidth >= 1100;
+
+                      if (useDesktopLayout) {
+                        return DesktopWeatherPage(
+                          cityController: cityController,
+                          weatherData: weatherData,
+                          isLoading: state.isLoading,
+                          errorMessage: visiblePageError,
+                          onSearch: _fetchWeatherByCity,
+                          onCurrentLocation: _fetchWeatherFromCurrentLocation,
+                          onRefresh: _refreshWeather,
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          Expanded(
+                            child: PageView(
+                              controller: pageController,
+                              physics: const BouncingScrollPhysics(),
+                              onPageChanged: (int page) {
+                                setState(() {
+                                  currentPage = page;
+                                });
+                              },
+                              children: [
+                                CurrentWeatherPage(
+                                  cityController: cityController,
+                                  weatherData: weatherData,
+                                  isLoading: state.isLoading,
+                                  errorMessage: visiblePageError,
+                                  onSearch: _fetchWeatherByCity,
+                                  onCurrentLocation:
+                                      _fetchWeatherFromCurrentLocation,
+                                  onRefresh: _refreshWeather,
+                                  onOpenForecast: () => openPage(1),
+                                ),
+                                ForecastDetailsPage(
+                                  weatherData: weatherData,
+                                  isLoading: state.isLoading,
+                                  errorMessage: visiblePageError,
+                                  onRefresh: _refreshWeather,
+                                  onBackToCurrent: () => openPage(0),
+                                ),
+                              ],
                             ),
-                            ForecastDetailsPage(
-                              weatherData: weatherData,
-                              isLoading: state.isLoading,
-                              errorMessage: visiblePageError,
-                              onRefresh: _refreshWeather,
-                              onBackToCurrent: () => openPage(0),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8, bottom: 12),
-                        child: buildPageIndicator(),
-                      ),
-                    ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 12),
+                            child: buildPageIndicator(),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ],

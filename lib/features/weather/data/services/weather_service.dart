@@ -17,7 +17,7 @@ class WeatherService {
 
   // Paste your newly rotated RapidAPI key here.
   static const String _apiKey =
-      '7a0716810emsh3de077da3551710p198a3bjsn7438bd3e83cb';
+      '6fb6472f1emshb13702de4ea1b7ep1091afjsn422be3ad2070';
 
   Map<String, String> get _headers {
     return {'X-RapidAPI-Key': _apiKey.trim(), 'X-RapidAPI-Host': _host};

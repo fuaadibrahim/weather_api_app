@@ -3,18 +3,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../data/models/weather_forecast_model.dart';
+import 'current_weather_card.dart';
 import 'weather_animation.dart';
 
 class CurrentWeatherPage extends StatelessWidget {
-  final TextEditingController cityController;
-  final WeatherForecastModel? weatherData;
-  final bool isLoading;
-  final String? errorMessage;
-  final Future<void> Function() onSearch;
-  final Future<void> Function() onCurrentLocation;
-  final Future<void> Function() onRefresh;
-  final VoidCallback onOpenForecast;
-
   const CurrentWeatherPage({
     super.key,
     required this.cityController,
@@ -27,59 +19,64 @@ class CurrentWeatherPage extends StatelessWidget {
     required this.onOpenForecast,
   });
 
-  ForecastItem? get currentForecast {
-    final forecasts = weatherData?.forecastList;
-
-    if (forecasts == null || forecasts.isEmpty) {
-      return null;
-    }
-
-    return forecasts.first;
-  }
-
-  WeatherCondition? get currentCondition {
-    final forecast = currentForecast;
-
-    if (forecast == null || forecast.weather.isEmpty) {
-      return null;
-    }
-
-    return forecast.weather.first;
-  }
+  final TextEditingController cityController;
+  final WeatherForecastModel? weatherData;
+  final bool isLoading;
+  final String? errorMessage;
+  final Future<void> Function() onSearch;
+  final Future<void> Function() onCurrentLocation;
+  final Future<void> Function() onRefresh;
+  final VoidCallback onOpenForecast;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final horizontalPadding = constraints.maxWidth < 600 ? 16.0 : 30.0;
+        final double horizontalPadding = constraints.maxWidth < 600 ? 16 : 30;
 
-        return RefreshIndicator(
-          onRefresh: onRefresh,
-          color: Colors.white,
-          backgroundColor: const Color(0xFF293E68),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              18,
-              horizontalPadding,
-              28,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1120),
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            18,
+            horizontalPadding,
+            0,
+          ),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1120),
+              child: SizedBox(
+                width: double.infinity,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     buildHeader(),
                     const SizedBox(height: 20),
                     buildSearchBar(),
-                    const SizedBox(height: 24),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 450),
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      child: buildPageContent(),
+                    const SizedBox(height: 18),
+
+                    // Only the weather content below the search bar scrolls.
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: onRefresh,
+                        color: Colors.white,
+                        backgroundColor: const Color(0xFF293E68),
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          padding: const EdgeInsets.only(top: 6, bottom: 28),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 450),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              child: buildPageContent(),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -260,11 +257,13 @@ class CurrentWeatherPage extends StatelessWidget {
   }
 
   Widget buildPageContent() {
+    // Every search, refresh, or location request shows the loading card.
     if (isLoading) {
       return buildLoadingState();
     }
 
-    if (errorMessage != null) {
+    // Show the large error card only when no weather data exists.
+    if (errorMessage != null && weatherData == null) {
       return buildErrorState();
     }
 
@@ -301,7 +300,8 @@ class CurrentWeatherPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Detecting the latest conditions for ${cityController.text.trim().isEmpty ? 'your location' : cityController.text.trim()}',
+            'Detecting the latest conditions for '
+            '${cityController.text.trim().isEmpty ? 'your location' : cityController.text.trim()}',
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.white70,
@@ -392,6 +392,7 @@ class CurrentWeatherPage extends StatelessWidget {
           SizedBox(height: 18),
           Text(
             'Please check your internet connection',
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
               fontSize: 21,
@@ -404,159 +405,12 @@ class CurrentWeatherPage extends StatelessWidget {
   }
 
   Widget buildCurrentWeather() {
-    final forecast = currentForecast!;
-    final condition = currentCondition;
-    final city = weatherData?.city;
-
-    final temperature = toCelsius(forecast.main?.temperature);
-
-    final feelsLike = toCelsius(forecast.main?.feelsLike);
-
-    final range = _getTodayTemperatureRange();
-
     return Column(
       key: const ValueKey('weather'),
       children: [
-        glassContainer(
-          width: double.infinity,
-          radius: 32,
-          opacity: 0.13,
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth >= 760;
-
-              final animation = WeatherAnimation(
-                condition: condition?.main,
-                iconCode: condition?.icon,
-                isLoading: false,
-                size: isWide ? 285 : 235,
-              );
-
-              final weatherDetails = Column(
-                crossAxisAlignment: isWide
-                    ? CrossAxisAlignment.start
-                    : CrossAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.near_me_outlined,
-                        color: Color(0xFFB9E9FF),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 7),
-                      Flexible(
-                        child: Text(
-                          '${city?.name ?? cityController.text}'
-                          '${city?.country?.isNotEmpty == true ? ', ${city!.country}' : ''}',
-                          textAlign: isWide
-                              ? TextAlign.start
-                              : TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: -0.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 13),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        temperature != null
-                            ? temperature.toStringAsFixed(0)
-                            : '--',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: isWide ? 78 : 68,
-                          fontWeight: FontWeight.bold,
-                          height: 0.95,
-                          letterSpacing: -3,
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.only(top: 4, left: 4),
-                        child: Text(
-                          '°C',
-                          style: TextStyle(
-                            color: Color(0xFFB9E9FF),
-                            fontSize: 21,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 11),
-                  Text(
-                    capitalize(condition?.description ?? 'Weather unavailable'),
-                    textAlign: isWide ? TextAlign.start : TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    'Feels like ${feelsLike?.toStringAsFixed(1) ?? '--'}°C',
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  const SizedBox(height: 18),
-                  Wrap(
-                    alignment: isWide
-                        ? WrapAlignment.start
-                        : WrapAlignment.center,
-                    spacing: 9,
-                    runSpacing: 9,
-                    children: [
-                      buildWeatherChip(
-                        icon: Icons.arrow_upward_rounded,
-                        label: range.maximum != null
-                            ? 'High ${range.maximum!.toStringAsFixed(0)}°'
-                            : 'High --',
-                      ),
-                      buildWeatherChip(
-                        icon: Icons.arrow_downward_rounded,
-                        label: range.minimum != null
-                            ? 'Low ${range.minimum!.toStringAsFixed(0)}°'
-                            : 'Low --',
-                      ),
-                      buildWeatherChip(
-                        icon: Icons.access_time_rounded,
-                        label: formatTime(forecast.dateTimeText),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-
-              if (isWide) {
-                return Row(
-                  children: [
-                    Expanded(child: animation),
-                    const SizedBox(width: 30),
-                    Expanded(child: weatherDetails),
-                  ],
-                );
-              }
-
-              return Column(
-                children: [
-                  animation,
-                  const SizedBox(height: 4),
-                  weatherDetails,
-                ],
-              );
-            },
-          ),
+        CurrentWeatherCard(
+          weatherData: weatherData!,
+          fallbackCity: cityController.text,
         ),
         const SizedBox(height: 18),
         buildForecastNavigationCard(),
@@ -647,32 +501,6 @@ class CurrentWeatherPage extends StatelessWidget {
     );
   }
 
-  Widget buildWeatherChip({required IconData icon, required String label}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.13)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: const Color(0xFFB9E9FF), size: 16),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   ButtonStyle primaryButtonStyle() {
     return ElevatedButton.styleFrom(
       elevation: 0,
@@ -721,96 +549,4 @@ class CurrentWeatherPage extends StatelessWidget {
       ),
     );
   }
-
-  _TemperatureRange _getTodayTemperatureRange() {
-    final forecasts = weatherData?.forecastList ?? [];
-
-    if (forecasts.isEmpty) {
-      return const _TemperatureRange();
-    }
-
-    final firstDate = parseDateTime(forecasts.first.dateTimeText);
-
-    if (firstDate == null) {
-      return const _TemperatureRange();
-    }
-
-    double? minimum;
-    double? maximum;
-
-    for (final forecast in forecasts) {
-      final date = parseDateTime(forecast.dateTimeText);
-
-      if (date == null ||
-          date.year != firstDate.year ||
-          date.month != firstDate.month ||
-          date.day != firstDate.day) {
-        continue;
-      }
-
-      final minValue = toCelsius(
-        forecast.main?.minimumTemperature ?? forecast.main?.temperature,
-      );
-
-      final maxValue = toCelsius(
-        forecast.main?.maximumTemperature ?? forecast.main?.temperature,
-      );
-
-      if (minValue != null && (minimum == null || minValue < minimum)) {
-        minimum = minValue;
-      }
-
-      if (maxValue != null && (maximum == null || maxValue > maximum)) {
-        maximum = maxValue;
-      }
-    }
-
-    return _TemperatureRange(minimum: minimum, maximum: maximum);
-  }
-
-  double? toCelsius(double? kelvin) {
-    if (kelvin == null) return null;
-
-    return kelvin - 273.15;
-  }
-
-  DateTime? parseDateTime(String? value) {
-    if (value == null || value.isEmpty) {
-      return null;
-    }
-
-    return DateTime.tryParse(value.replaceFirst(' ', 'T'));
-  }
-
-  String formatTime(String? value) {
-    final date = parseDateTime(value);
-
-    if (date == null) return '--';
-
-    int hour = date.hour;
-    final minute = date.minute.toString().padLeft(2, '0');
-
-    final period = hour >= 12 ? 'PM' : 'AM';
-
-    if (hour == 0) {
-      hour = 12;
-    } else if (hour > 12) {
-      hour -= 12;
-    }
-
-    return '$hour:$minute $period';
-  }
-
-  String capitalize(String text) {
-    if (text.isEmpty) return text;
-
-    return text[0].toUpperCase() + text.substring(1);
-  }
-}
-
-class _TemperatureRange {
-  final double? minimum;
-  final double? maximum;
-
-  const _TemperatureRange({this.minimum, this.maximum});
 }

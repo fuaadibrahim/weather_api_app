@@ -1,43 +1,84 @@
 import '../../data/models/weather_forecast_model.dart';
 
-class WeatherState {
-  const WeatherState({
+sealed class WeatherState {
+  const WeatherState();
+
+  WeatherForecastModel? get weatherData => null;
+
+  bool get isLoading => false;
+
+  String? get errorMessage => null;
+
+  bool get usingCurrentLocation => false;
+
+  String? get lastSearchedCity => null;
+}
+
+final class WeatherInitial extends WeatherState {
+  const WeatherInitial();
+
+  @override
+  bool get isLoading => true;
+}
+
+final class WeatherEmpty extends WeatherState {
+  const WeatherEmpty();
+}
+
+final class WeatherLoading extends WeatherState {
+  @override
+  final WeatherForecastModel? weatherData;
+
+  @override
+  final bool usingCurrentLocation;
+
+  @override
+  final String? lastSearchedCity;
+
+  const WeatherLoading({
     this.weatherData,
-    this.isLoading = false,
-    this.errorMessage,
     this.usingCurrentLocation = false,
     this.lastSearchedCity,
-    this.isInitialized = false,
   });
 
-  final WeatherForecastModel? weatherData;
-  final bool isLoading;
-  final String? errorMessage;
-  final bool usingCurrentLocation;
-  final String? lastSearchedCity;
-  final bool isInitialized;
+  @override
+  bool get isLoading => true;
+}
 
-  WeatherState copyWith({
-    WeatherForecastModel? weatherData,
-    bool? isLoading,
-    String? errorMessage,
-    bool clearErrorMessage = false,
-    bool? usingCurrentLocation,
-    String? lastSearchedCity,
-    bool clearLastSearchedCity = false,
-    bool? isInitialized,
-  }) {
-    return WeatherState(
-      weatherData: weatherData ?? this.weatherData,
-      isLoading: isLoading ?? this.isLoading,
-      errorMessage: clearErrorMessage
-          ? null
-          : errorMessage ?? this.errorMessage,
-      usingCurrentLocation: usingCurrentLocation ?? this.usingCurrentLocation,
-      lastSearchedCity: clearLastSearchedCity
-          ? null
-          : lastSearchedCity ?? this.lastSearchedCity,
-      isInitialized: isInitialized ?? this.isInitialized,
-    );
-  }
+final class WeatherLoaded extends WeatherState {
+  @override
+  final WeatherForecastModel weatherData;
+
+  @override
+  final bool usingCurrentLocation;
+
+  @override
+  final String? lastSearchedCity;
+
+  const WeatherLoaded({
+    required this.weatherData,
+    required this.usingCurrentLocation,
+    this.lastSearchedCity,
+  });
+}
+
+final class WeatherFailure extends WeatherState {
+  @override
+  final String errorMessage;
+
+  @override
+  final WeatherForecastModel? weatherData;
+
+  @override
+  final bool usingCurrentLocation;
+
+  @override
+  final String? lastSearchedCity;
+
+  const WeatherFailure({
+    required this.errorMessage,
+    this.weatherData,
+    this.usingCurrentLocation = false,
+    this.lastSearchedCity,
+  });
 }
